@@ -65,9 +65,62 @@ print_status "Creating project directory..."
 mkdir -p /var/www/next-app
 cd /var/www/next-app || print_error "Failed to create project directory"
 
-# Clone the repository (replace with your actual repo URL)
+# Create package.json if it doesn't exist
+print_status "Creating initial package.json..."
+cat > package.json << EOL
+{
+  "name": "physics-practice",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "db:seed": "ts-node prisma/seed.ts"
+  },
+  "dependencies": {
+    "@auth/core": "^0.18.0",
+    "@prisma/client": "^5.0.0",
+    "@tabler/icons-react": "^2.40.0",
+    "@tremor/react": "^3.11.1",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.2.0",
+    "next": "14.0.4",
+    "next-auth": "^4.24.5",
+    "react": "^18",
+    "react-dom": "^18",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.0.1",
+    "eslint": "^8",
+    "eslint-config-next": "14.0.4",
+    "postcss": "^8",
+    "prisma": "^5.0.0",
+    "tailwindcss": "^3.3.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5"
+  }
+}
+EOL
+
+# Clone the repository
 print_status "Cloning the repository..."
-git clone https://github.com/smartsina/Physics-Practice.git . || print_error "Failed to clone repository"
+git clone https://github.com/smartsina/Physics-Practice.git temp || print_error "Failed to clone repository"
+
+# Copy files from temp directory
+print_status "Copying project files..."
+cp -r temp/* . || print_error "Failed to copy project files"
+cp -r temp/.* . 2>/dev/null || print_warning "No hidden files to copy"
+rm -rf temp
 
 # Install project dependencies
 print_status "Installing project dependencies..."
@@ -93,11 +146,36 @@ npx prisma db push || print_error "Failed to push database schema"
 print_status "Building the application..."
 npm run build || print_error "Failed to build the application"
 
+# Set up PM2 ecosystem file
+print_status "Creating PM2 ecosystem file..."
+cat > ecosystem.config.js << EOL
+module.exports = {
+  apps: [{
+    name: 'next-app',
+    script: 'npm',
+    args: 'start',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    },
+    watch: false,
+    max_memory_restart: '1G',
+    restart_delay: 3000,
+    max_restarts: 10
+  }]
+}
+EOL
+
 # Start the application with PM2
 print_status "Starting the application..."
-pm2 start npm --name "next-app" -- start || print_error "Failed to start the application"
+pm2 start ecosystem.config.js || print_error "Failed to start the application"
 pm2 save || print_warning "Failed to save PM2 process list"
 pm2 startup || print_warning "Failed to setup PM2 startup script"
+
+# Set correct permissions
+print_status "Setting correct permissions..."
+chown -R www-data:www-data /var/www/next-app
+chmod -R 755 /var/www/next-app
 
 # Print completion message
 echo -e "\n${GREEN}Setup completed successfully!${NC}"
@@ -112,3 +190,8 @@ echo "2. Check process status: pm2 status"
 echo "3. Restart application: pm2 restart next-app"
 echo "4. View PostgreSQL logs: tail -f /var/log/postgresql/postgresql-14-main.log"
 echo "5. Check firewall status: ufw status"
+echo "6. Monitor system resources: htop"
+echo "7. Check Node.js version: node --version"
+echo "8. Check npm version: npm --version"
+echo "9. Check database connection: psql -U nextuser -d nextdb -h localhost"
+echo "10. View application error logs: tail -f /var/www/next-app/.next/error.log"
