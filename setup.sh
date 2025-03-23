@@ -183,14 +183,14 @@ if [ ! -f "package.json" ]; then
     "db:seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {
-    "@auth/core": "^0.18.0",
+    "@auth/core": "0.34.2",
     "@prisma/client": "^5.0.0",
     "@tabler/icons-react": "^2.40.0",
     "@tremor/react": "^3.11.1",
     "bcryptjs": "^2.4.3",
     "jose": "^5.2.0",
     "next": "14.0.4",
-    "next-auth": "^4.24.5",
+    "next-auth": "^4.24.11",
     "react": "^18",
     "react-dom": "^18",
     "zod": "^3.22.4"
@@ -230,11 +230,12 @@ else
     git pull origin main || print_warning "Failed to update repository"
 fi
 
-# Install project dependencies if node_modules doesn't exist or if package.json has changed
-if [ ! -d "node_modules" ] || [ "package.json" -nt "node_modules" ]; then
-    print_status "Installing project dependencies..."
-    npm install || print_error "Failed to install project dependencies"
-fi
+# Install project dependencies
+print_status "Installing project dependencies..."
+npm install --legacy-peer-deps || {
+    print_warning "Failed to install with --legacy-peer-deps, trying with --force..."
+    npm install --force || print_error "Failed to install project dependencies"
+}
 
 # Create or update .env file if it doesn't exist
 if [ ! -f ".env" ]; then
